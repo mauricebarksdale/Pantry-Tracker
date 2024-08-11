@@ -2,8 +2,8 @@
 import Image from "next/image";
 import { useState, useEffect } from "react";
 import { firestore } from "../firebase";
-import { collection, doc, query, getDocs, getDoc, deleteDoc, setDoc, addDoc } from "firebase/firestore";
-import { Box, Typography, Modal, Stack, TextField, Button } from "@mui/material";
+import { collection, doc, query, where, getDocs, getDoc, deleteDoc, setDoc } from "firebase/firestore";
+import { Box, Typography, Modal, Stack, TextField, Button, FormControl, OutlinedInput } from "@mui/material";
 
 const style = {
   position: 'absolute',
@@ -24,6 +24,14 @@ export default function Home() {
   const [inventory, setInventory] = useState([]);
   const [open, setOpen] = useState(false);
   const [itemName, setItemName] = useState("");
+  const [searchPhrase, setSearchPhrase] = useState("");
+
+  const handleOpen = () => setOpen(true);
+  const handleClose = () => setOpen(false);
+
+  useEffect(() => {
+    updateInventory();
+  }, []);
 
   const updateInventory = async() => {
     // Get snapshot of inventory
@@ -47,14 +55,14 @@ export default function Home() {
 
   const removeItem = async (item) => {
     // Get direct item reference
-    const docRef = doc(collection(firestore, 'inventory', item));
+    const docRef = doc(collection(firestore, 'inventory'), item);
 
     // Get snapshot of item data
     const docSnap = await getDoc(docRef);
 
     // Decrement count by 1 or delete if no more of the item is remaining
     if (docSnap.exists()) {
-      const {quantity} = docSnap.data;
+      const {quantity} = docSnap.data();
       
       if (quantity === 1) {
         await deleteDoc(docRef);
@@ -86,12 +94,31 @@ export default function Home() {
     await updateInventory();
   }
 
-  const handleOpen = () => setOpen(true);
-  const handleClose = () => setOpen(false);
-
-  useEffect(() => {
-    updateInventory();
-  }, []);
+  const searchItem = async (phrase) => {
+    if (phrase) {
+      // Get items that contain the search phrase
+      const snapshot = query(collection(firestore, 'inventory'));
+  
+      // Get snapshot of item data
+      const docRefs = await getDocs(snapshot);
+      
+      // Filter items that contain the search phrase
+      const inventoryList = [];
+      docRefs.forEach(doc => {
+        if (doc.id.toLowerCase().includes(phrase.toLowerCase())) {
+          inventoryList.push({
+            name: doc.id,
+            ...doc.data()
+          });
+        }
+      });
+  
+      setInventory(inventoryList);
+    } else {
+      // Get the entire collection if the phrase is blank
+      await updateInventory();
+    }
+  }
 
   return (
     <>
@@ -144,6 +171,30 @@ export default function Home() {
         <Button variant="contained" onClick={handleOpen}>
           Add New Item
         </Button>
+        <Box>
+          <FormControl>
+            <Stack 
+              direction="row" 
+              spacing={5} 
+              justifyContent="center" 
+              alignItems="center"
+            >
+              <OutlinedInput 
+                id="ItemPhrase"
+                variant="outlined" 
+                placeholder="Search for item by name"
+                sx={{ width: '50vh'}}
+                value={searchPhrase}
+                onChange={(e) => setSearchPhrase(e.target.value)}
+              />
+              <Button 
+                variant="contained" 
+                onClick={() => searchItem(searchPhrase)}>
+                  Search
+              </Button>
+            </Stack>
+          </FormControl>
+        </Box>
         <Box border={'1px solid #333'}>
           <Box
             width="800px"
